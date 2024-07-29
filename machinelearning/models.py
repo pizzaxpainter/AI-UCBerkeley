@@ -37,7 +37,8 @@ class PerceptronModel(Module):
         super(PerceptronModel, self).__init__()
         
         "*** YOUR CODE HERE ***"
-        self.w = None #Initialize your weights here
+        self.w = Parameter(ones(dimensions))
+         #Initialize your weights here
 
     def get_weights(self):
         """
@@ -47,8 +48,7 @@ class PerceptronModel(Module):
 
     def run(self, x):
         """
-        Calculates the score assigned by the perceptron to a data point x.
-
+        Calculates the score assigned by the perceptron to a data point x.        
         Inputs:
             x: a node with shape (1 x dimensions)
         Returns: a node containing a single number (the score)
@@ -56,6 +56,8 @@ class PerceptronModel(Module):
         The pytorch function `tensordot` may be helpful here.
         """
         "*** YOUR CODE HERE ***"
+        return tensordot(self.w, x, dims=1)
+    
 
 
     def get_prediction(self, x):
@@ -65,7 +67,7 @@ class PerceptronModel(Module):
         Returns: 1 or -1
         """
         "*** YOUR CODE HERE ***"
-
+        return 1 if self.run(x) >= 0 else -1
 
 
     def train(self, dataset):
@@ -77,10 +79,19 @@ class PerceptronModel(Module):
         Each sample in the dataloader is in the form {'x': features, 'label': label} where label
         is the item we need to predict based off of its features.
         """        
+        "*** YOUR CODE HERE ***"
+        
         with no_grad():
             dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
             "*** YOUR CODE HERE ***"
-
+            for sample in dataloader:
+                x = sample['x']
+                y = sample['label']
+                y_pred = self.get_prediction(x)
+                if y_pred != y:
+                    self.w += y * x
+                if all(self.get_prediction(sample['x']) == sample['label'] for sample in dataloader):
+                    break
 
 
 class RegressionModel(Module):
@@ -94,6 +105,11 @@ class RegressionModel(Module):
         "*** YOUR CODE HERE ***"
         super().__init__()
 
+        self.layer1 = Linear(1, 100)
+        self.layer2 = Linear(100, 100)
+        self.layer3 = Linear(100, 1)
+        self.optimizer = optim.SGD(self.parameters(), lr=0.01)
+
 
 
     def forward(self, x):
@@ -106,6 +122,10 @@ class RegressionModel(Module):
             A node with shape (batch_size x 1) containing predicted y-values
         """
         "*** YOUR CODE HERE ***"
+        x = relu(self.layer1(x))
+        x = relu(self.layer2(x))
+        x = self.layer3(x)
+        return x
 
     
     def get_loss(self, x, y):
@@ -119,7 +139,8 @@ class RegressionModel(Module):
         Returns: a tensor of size 1 containing the loss
         """
         "*** YOUR CODE HERE ***"
- 
+        return mse_loss(self.forward(x), y)
+
   
 
     def train(self, dataset):
@@ -137,6 +158,16 @@ class RegressionModel(Module):
             
         """
         "*** YOUR CODE HERE ***"
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        for sample in dataloader:
+            self.optimizer.zero_grad()
+            loss = self.get_loss(sample['x'], sample['label'])
+            loss.backward()
+            self.optimizer.step()
+            if loss < 0.02:
+                break
+
+
 
 
             
@@ -167,7 +198,10 @@ class DigitClassificationModel(Module):
         input_size = 28 * 28
         output_size = 10
         "*** YOUR CODE HERE ***"
-
+        self.layer1 = Linear(input_size, 100)
+        self.layer2 = Linear(100, 100)
+        self.layer3 = Linear(100, output_size)
+        self.optimizer = optim.SGD(self.parameters(), lr=0.01)
 
 
     def run(self, x):
@@ -185,6 +219,10 @@ class DigitClassificationModel(Module):
                 (also called logits)
         """
         """ YOUR CODE HERE """
+        x = relu(self.layer1(x))
+        x = relu(self.layer2(x))
+        x = self.layer3(x)
+        return x
 
 
     def get_loss(self, x, y):
@@ -201,6 +239,7 @@ class DigitClassificationModel(Module):
         Returns: a loss tensor
         """
         """ YOUR CODE HERE """
+        return cross_entropy(self.run(x), y)
 
         
 
@@ -209,7 +248,14 @@ class DigitClassificationModel(Module):
         Trains the model.
         """
         """ YOUR CODE HERE """
-
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        for sample in dataloader:
+            self.optimizer.zero_grad()
+            loss = self.get_loss(sample['x'], sample['label'])
+            loss.backward()
+            self.optimizer.step()
+            if loss < 0.02:
+                break
 
 
 class LanguageIDModel(Module):
@@ -230,6 +276,10 @@ class LanguageIDModel(Module):
         super(LanguageIDModel, self).__init__()
         "*** YOUR CODE HERE ***"
         # Initialize your model parameters here
+        self.hidden_size = 100
+        self.layer1 = Linear(self.num_chars, self.hidden_size)
+        self.layer2 = Linear(self.hidden_size, 5)
+        self.optimizer = optim.SGD(self.parameters(), lr=0.01)
 
 
     def run(self, xs):
@@ -262,6 +312,13 @@ class LanguageIDModel(Module):
                 (also called logits)
         """
         "*** YOUR CODE HERE ***"
+        x = empty((len(xs), self.num_chars))
+        for i in range(len(xs)):
+            x[i] = xs[i]
+        x = movedim(x, 0, 1)
+        x = relu(self.layer1(x))
+        x = self.layer2(x)
+        return x
 
     
     def get_loss(self, xs, y):
@@ -279,6 +336,7 @@ class LanguageIDModel(Module):
         Returns: a loss node
         """
         "*** YOUR CODE HERE ***"
+        return cross_entropy(self.run(xs), y)
 
 
     def train(self, dataset):
@@ -296,6 +354,14 @@ class LanguageIDModel(Module):
         For more information, look at the pytorch documentation of torch.movedim()
         """
         "*** YOUR CODE HERE ***"
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        for sample in dataloader:
+            self.optimizer.zero_grad()
+            loss = self.get_loss(sample['x'], sample['label'])
+            loss.backward()
+            self.optimizer.step()
+            if loss < 0.02:
+                break
 
         
 
@@ -316,6 +382,11 @@ def Convolve(input: tensor, weight: tensor):
     weight_dimensions = weight.shape
     Output_Tensor = tensor(())
     "*** YOUR CODE HERE ***"
+    "*** Begin Code ***"
+    Output_Tensor = empty((input_tensor_dimensions[0] - weight_dimensions[0] + 1, input_tensor_dimensions[1] - weight_dimensions[1] + 1))
+    for i in range(input_tensor_dimensions[0] - weight_dimensions[0] + 1):
+        for j in range(input_tensor_dimensions[1] - weight_dimensions[1] + 1):
+            Output_Tensor[i, j] = (input[i:i + weight_dimensions[0], j:j + weight_dimensions[1]].flatten() * weight.flatten()).sum() 
 
     
     "*** End Code ***"
@@ -342,6 +413,10 @@ class DigitConvolutionalModel(Module):
 
         self.convolution_weights = Parameter(ones((3, 3)))
         """ YOUR CODE HERE """
+        self.layer1 = Linear(28 * 28, 100)
+        self.layer2 = Linear(100, 100)
+        self.layer3 = Linear(100, output_size)
+        self.optimizer = optim.SGD(self.parameters(), lr=0.01)
 
 
     def run(self, x):
@@ -353,7 +428,10 @@ class DigitConvolutionalModel(Module):
         x = stack(list(map(lambda sample: Convolve(sample, self.convolution_weights), x)))
         x = x.flatten(start_dim=1)
         """ YOUR CODE HERE """
-
+        x = relu(self.layer1(x))
+        x = relu(self.layer2(x))
+        x = self.layer3(x)
+        return x
  
 
     def get_loss(self, x, y):
@@ -370,6 +448,7 @@ class DigitConvolutionalModel(Module):
         Returns: a loss tensor
         """
         """ YOUR CODE HERE """
+        return cross_entropy(self.run(x), y)
 
         
 
@@ -378,4 +457,14 @@ class DigitConvolutionalModel(Module):
         Trains the model.
         """
         """ YOUR CODE HERE """
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        for sample in dataloader:
+            self.optimizer.zero_grad()
+            loss = self.get_loss(sample['x'], sample['label'])
+            loss.backward()
+            self.optimizer.step()
+            if loss < 0.02:
+                break
+
+            
  
